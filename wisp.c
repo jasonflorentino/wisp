@@ -24,8 +24,7 @@ void add_history(char* unused)
 #include <editline/readline.h>
 #endif
 
-enum { WERR_DIV_ZERO, WERR_BAD_OP, WERR_BAD_NUM };
-enum { WVAL_ERR, WVAL_NUM, WVAL_SYM, WVAL_SYMEXPR };
+enum { WVAL_ERR, WVAL_NUM, WVAL_SYM, WVAL_SYMEXPR, WVAL_QEXPR };
 
 typedef struct wval
 {
@@ -72,6 +71,15 @@ wval* wval_symexpr(void)
 	return v;
 }
 
+wval* wval_qexpr(void)
+{
+	wval* v = malloc(sizeof(wval));
+	v->type = WVAL_QEXPR;
+	v->count = 0;
+	v->cell = NULL;
+	return v;
+}
+
 void wval_del(wval* v)
 {
 	switch (v->type)
@@ -79,6 +87,7 @@ void wval_del(wval* v)
 		case WVAL_NUM: break;
 		case WVAL_ERR: free(v->err); break;
 		case WVAL_SYM: free(v->sym); break;
+		case WVAL_QEXPR:
 		case WVAL_SYMEXPR:
 			for (int i = 0; i < v->count; i++) {
 				wval_del(v->cell[i]);
@@ -124,6 +133,20 @@ wval* wval_take(wval* v, int i)
 	return x;
 }
 
+/**
+ * `wval_join` pops each item from `y`, adds it to `x`
+ * then returns `x`.
+ */
+wval* wval_join(wval* x, wval* y)
+{
+	while (y->count) {
+		x = wval_add(x, wval_pop(y, 0));
+	}
+
+	wval_del(y);
+	return x;
+}
+
 void wval_print(wval* v);
 void wval_expr_print(wval* v, char open, char close)
 {
@@ -146,6 +169,7 @@ void wval_print(wval* v)
 		case WVAL_ERR:     printf("Error: %s", v->err); break;
 		case WVAL_SYM:	   printf("%s", v->sym); break;
 		case WVAL_SYMEXPR: wval_expr_print(v, '(', ')'); break;
+		case WVAL_QEXPR:   wval_expr_print(v, '{', '}'); break;
 	}
 }
 
@@ -154,6 +178,92 @@ void wval_println(wval* v)
 	printf("    <~  ");
 	wval_print(v);
 	putchar('\n');
+}
+
+#define WASSERT(args, cond, err) \
+	if (!(cond)) { wval_del(args); return wval_err(err); }
+
+wval* wval_eval(wval* v);
+
+/**
+ * `head` takes a Q-Expression and returns a Q-Expression with only
+ * the first element.
+ */
+wval* builtin_head(wval* a)
+{
+	WASSERT(a, a->count == 1,
+		"Function 'head' received too many arguments!");
+	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
+		"Function 'head' received incorrect type!");
+	WASSERT(a, a->cell[0]->count != 0,
+		"Function 'head' received {}!");
+
+	wval* v = wval_take(a, 0);
+	while (v->count > 1) { wval_del(wval_pop(v, 1)); }
+	return v;
+}
+
+/**
+ * `tail` takes a Q-Expression and returns a Q-Expression with
+ * the first element removed.
+ */
+wval* builtin_tail(wval* a)
+{
+	WASSERT(a, a->count == 1,
+		"Function 'tail' received too many arguments!");
+	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
+		"Function 'tail' received incorrect type!");
+	WASSERT(a, a->cell[0]->count != 0,
+		"Function 'tail' received {}!");
+
+	wval* v = wval_take(a, 0);
+	wval_del(wval_pop(v, 0));
+	return v;
+}
+
+/**
+ * `list` takes an S-Expression and returns it as a Q-Expression.
+ */
+wval* builtin_list(wval* a)
+{
+	a->type = WVAL_QEXPR;
+	return a;
+}
+
+/**
+ * `builtin_join` takes one or more Q-Expressions and returns
+ * a Q-Expression of them joined together.
+ */
+wval* builtin_join(wval* a)
+{
+	for (int i = 0; i < a->count; i++) {
+		WASSERT(a, a->cell[i]->type == WVAL_QEXPR,
+			"Function 'join' received incorrect type!");
+	}
+	
+	wval* x = wval_pop(a, 0);
+	while (a->count) {
+		x = wval_join(x, wval_pop(a, 0));
+	}
+	
+	wval_del(a);
+	return x;
+}
+
+/**
+ * `eval` takes a single Q-Expression, converts it to an S-Expression
+ * and evaluates it using `wval_eval`.
+ */
+wval* builtin_eval(wval* a)
+{
+	WASSERT(a, a->count == 1,
+		"Function 'eval' received too many arguments!");
+	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
+		"Function 'eval' received incorrect type!");
+
+	wval* x = wval_take(a, 0);
+	x->type = WVAL_SYMEXPR;
+	return wval_eval(x);
 }
 
 /**
@@ -198,6 +308,19 @@ wval* builtin_op(wval* a, char* op)
 	return x;
 }
 
+wval* builtin(wval* a, char* func)
+{
+	if (strcmp("list", func) == 0) { return builtin_list(a); }
+	if (strcmp("head", func) == 0) { return builtin_head(a); }
+	if (strcmp("tail", func) == 0) { return builtin_tail(a); }
+	if (strcmp("join", func) == 0) { return builtin_join(a); }
+	if (strcmp("eval", func) == 0) { return builtin_eval(a); }
+	if (strstr("+-/*%", func)) { return builtin_op(a, func); }
+
+	wval_del(a);
+	return wval_err("Unknown Function!");
+}
+
 /**
  * `wval_eval_symexp` takes an `wval*` and transforms it to a new `wval*`
  * First evaluate the children. If there are any errors, return the first
@@ -205,7 +328,6 @@ wval* builtin_op(wval* a, char* op)
  * Then if single single expression, return it contained in parenthesis.
  * Else we have a valid expression with more than one child.
  */
-wval* wval_eval(wval* v);
 wval* wval_eval_symexpr(wval* v)
 {
 	for (int i = 0; i < v->count; i++) {
@@ -228,7 +350,7 @@ wval* wval_eval_symexpr(wval* v)
 		return wval_err("S-Expression does not start with a symbol!");
 	}
 
-	wval* result = builtin_op(v, f->sym);
+	wval* result = builtin(v, f->sym);
 	wval_del(f);
 	return result;
 }
@@ -270,11 +392,14 @@ wval* wval_read(mpc_ast_t* t)
 	wval* x = NULL;
 	if (strcmp(t->tag, ">") == 0)  { x = wval_symexpr(); }
 	if (strstr(t->tag, "symexpr")) { x = wval_symexpr(); }
+	if (strstr(t->tag, "qexpr"))   { x = wval_qexpr(); }
 
 	for (int i = 0; i < t->children_num; i++)
 	{
 		if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
 		if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
+		if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
+		if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
 		if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
 		x = wval_add(x, wval_read(t->children[i]));
 	}
@@ -287,22 +412,27 @@ int main(int argc, char** argv)
 	mpc_parser_t* Number  = mpc_new("number");
 	mpc_parser_t* Symbol  = mpc_new("symbol");
 	mpc_parser_t* Symexpr = mpc_new("symexpr");
+	mpc_parser_t* Qexpr   = mpc_new("qexpr");
 	mpc_parser_t* Expr    = mpc_new("expr");
 	mpc_parser_t* Wispy   = mpc_new("wispy");
 
 	mpca_lang(MPCA_LANG_DEFAULT,
-		"                                                     \
-			number  : /-?[0-9]+(\\.[0-9]+)?/ ;            \
-			symbol  : '+' | '-' | '*' | '/' | '%' | '^' ; \
-			symexpr : '(' <expr>* ')' ;                   \
-			expr    : <number> | <symbol> | <symexpr>  ;  \
-			wispy   : /^/ <expr>* /$/ ;                   \
+		"                                                             \
+			number  : /-?[0-9]+(\\.[0-9]+)?/ ;                    \
+			symbol  : \"list\" | \"head\" | \"tail\"              \
+				| \"join\" | \"eval\"                         \
+				| '+' | '-' | '*' | '/' | '%' | '^' ;         \
+			symexpr : '(' <expr>* ')' ;                           \
+			qexpr   : '{' <expr>* '}' ;                           \
+			expr    : <number> | <symbol> | <symexpr> | <qexpr> ; \
+			wispy   : /^/ <expr>* /$/ ;                           \
 		",
-		Number, Symbol, Symexpr, Expr, Wispy);
+		Number, Symbol, Symexpr, Qexpr, Expr, Wispy);
 	
-	puts("\nWispy Version 0.0.0.0.4");
-	puts("A lisp-y language by Jason");
-	puts("Press Ctrl+C to exit\n");
+	puts("\n Wispy Version 0.0.0.0.5");
+	puts(" A lisp-y language by Jason");
+	puts(" Made with the help of buildyourownlisp.com by Daniel Holden");
+	puts(" Press Ctrl+C to exit\n");
 
 	while (1)
 	{
@@ -324,6 +454,6 @@ int main(int argc, char** argv)
 		}
 		free(input);
 	}
-	mpc_cleanup(5, Number, Symbol, Symexpr, Expr, Wispy);
+	mpc_cleanup(5, Number, Symbol, Symexpr, Qexpr, Expr, Wispy);
 	return 0;
 }

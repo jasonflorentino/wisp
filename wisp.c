@@ -48,12 +48,20 @@ struct wval
 };
 
 
-wval* wval_err(char* m)
+wval* wval_err(char* fmt, ...)
 {
 	wval* v = malloc(sizeof(wval));
 	v->type = WVAL_ERR;
-	v->err = malloc(strlen(m) + 1);
-	strcpy(v->err, m);
+
+	va_list va;
+	va_start(va, fmt);
+
+	v->err = malloc(512);
+	vsnprintf(v->err, 511, fmt, va);
+
+	v->err = realloc(v->err, strlen(v->err)+1);
+
+	va_end(va);
 	return v;
 }
 
@@ -229,6 +237,20 @@ void wval_println(wval* v)
 	putchar('\n');
 }
 
+char* wtype_name(int t)
+{
+	switch(t)
+	{
+		case WVAL_FUN: return "Function";
+		case WVAL_NUM: return "Number";
+		case WVAL_ERR: return "Error";
+		case WVAL_SYM: return "Symbol";
+		case WVAL_SEXPR: return "S-Expression";
+		case WVAL_QEXPR: return "Q-Expression";
+		default: return "Unknown";
+	}
+}
+
 /**
  * Wisp Environment
  */
@@ -268,7 +290,7 @@ wval* wenv_get(wenv* e, wval* k)
 			return wval_copy(e->vals[i]);
 		}
 	}
-	return wval_err("Unbound symbol!");
+	return wval_err("Unbound symbol `%s`", k->sym);
 }
 
 void wenv_put(wenv* e, wval* k, wval* v)
@@ -291,8 +313,26 @@ void wenv_put(wenv* e, wval* k, wval* v)
 	strcpy(e->syms[e->count-1], k->sym);
 }
 
-#define WASSERT(args, cond, err) \
-	if (!(cond)) { wval_del(args); return wval_err(err); }
+#define WASSERT(args, cond, fmt, ...) \
+	if (!(cond)) { \
+		wval* err = wval_err(fmt, ##__VA_ARGS__); \
+		wval_del(args); \
+		return err; \
+	}
+
+#define WASSERT_TYPE(func, args, index, expect) \
+	WASSERT(args, args->cell[index]->type == expect, \
+		"Function '%s' passed incorrect type for argument %i. Got %s, Expected %s", \
+		func, index, wtype_name(args->cell[index]->type), wtype_name(expect))
+
+#define WASSERT_NUM(func, args, num) \
+	WASSERT(args, args->count == num, \
+		"Funcion '%s' passed incorrect number of arguments. Got %i, Expected %i.", \
+		func, args->count, num)
+
+#define WASSERT_NOT_EMPTY(func, args, index) \
+	WASSERT(args, args->cell[index]->count != 0, \
+		"Function '%s' passed {} for argument %i.", func, index);
 
 wval* wval_eval(wenv* e, wval* v);
 
@@ -302,13 +342,10 @@ wval* wval_eval(wenv* e, wval* v);
  */
 wval* builtin_head(wenv* e, wval* a)
 {
-	WASSERT(a, a->count == 1,
-		"Function 'head' received too many arguments!");
-	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
-		"Function 'head' received incorrect type!");
-	WASSERT(a, a->cell[0]->count != 0,
-		"Function 'head' received {}!");
-
+	WASSERT_NUM("head", a, 1);
+	WASSERT_TYPE("head", a, 0, WVAL_QEXPR);
+	WASSERT_NOT_EMPTY("head", a, 0);
+	
 	wval* v = wval_take(a, 0);
 	while (v->count > 1) { wval_del(wval_pop(v, 1)); }
 	return v;
@@ -320,12 +357,9 @@ wval* builtin_head(wenv* e, wval* a)
  */
 wval* builtin_tail(wenv* e, wval* a)
 {
-	WASSERT(a, a->count == 1,
-		"Function 'tail' received too many arguments!");
-	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
-		"Function 'tail' received incorrect type!");
-	WASSERT(a, a->cell[0]->count != 0,
-		"Function 'tail' received {}!");
+	WASSERT_NUM("tail", a, 1);
+	WASSERT_TYPE("tail", a, 0, WVAL_QEXPR);
+	WASSERT_NOT_EMPTY("tail", a, 0);
 
 	wval* v = wval_take(a, 0);
 	wval_del(wval_pop(v, 0));
@@ -348,8 +382,7 @@ wval* builtin_list(wenv* e, wval* a)
 wval* builtin_join(wenv* e, wval* a)
 {
 	for (int i = 0; i < a->count; i++) {
-		WASSERT(a, a->cell[i]->type == WVAL_QEXPR,
-			"Function 'join' received incorrect type!");
+		WASSERT_TYPE("join", a, i, WVAL_QEXPR); 
 	}
 	
 	wval* x = wval_pop(a, 0);
@@ -367,10 +400,8 @@ wval* builtin_join(wenv* e, wval* a)
  */
 wval* builtin_eval(wenv* e, wval* a)
 {
-	WASSERT(a, a->count == 1,
-		"Function 'eval' received too many arguments!");
-	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
-		"Function 'eval' received incorrect type!");
+	WASSERT_NUM("eval", a, 1);
+	WASSERT_TYPE("eval", a, 0, WVAL_QEXPR);
 
 	wval* x = wval_take(a, 0);
 	x->type = WVAL_SEXPR;
@@ -387,10 +418,7 @@ wval* builtin_eval(wenv* e, wval* a)
 wval* builtin_op(wenv* e, wval* a, char* op)
 {
 	for (int i = 0; i < a->count; i++) {
-		if (a->cell[i]->type != WVAL_NUM) {
-			wval_del(a);
-			return wval_err("Cannot operate on non-number!");
-		}
+		WASSERT_TYPE(op, a, i, WVAL_NUM);	
 	}
 	
 	wval* x = wval_pop(a, 0);
@@ -437,19 +465,21 @@ wval* builtin_div(wenv* e, wval* a) {
 
 wval* builtin_def(wenv* e, wval* a)
 {
-	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
-		"Function 'def' received incorrect type!");
+	WASSERT_TYPE("def", a, 0, WVAL_QEXPR);
 
 	wval* syms = a->cell[0];
 	for (int i = 0; i < syms->count; i++)
 	{
-		WASSERT(a, syms->cell[i]->type == WVAL_SYM,
-			"Function 'def' cannot define non-symbol!");
+		WASSERT(a, (syms->cell[i]->type == WVAL_SYM),
+			"Function 'def' cannot define non-symbol! ",
+			"Got %s, Expected %s.",
+			wtype_name(syms->cell[i]->type), wtype_name(WVAL_SYM));
 	}
 
-	WASSERT(a, syms->count == a->count-1,
-		"Function 'def' cannot define incorrect "
-		"number of values to symbols!");
+	WASSERT(a, (syms->count == a->count-1),
+		"Function 'def' passed incorrect number of arguments for symbols. "
+		"Got %i, Expected %i.",
+		syms->count, a->count-1);
 
 	for (int i = 0; i < syms->count; i++) {
 		wenv_put(e, syms->cell[i], a->cell[i+1]);
@@ -623,6 +653,6 @@ int main(int argc, char** argv)
 		free(input);
 	}
 	wenv_del(e);
-	mpc_cleanup(5, Number, Symbol, Sexpr, Qexpr, Expr, Wispy);
+	mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Wispy);
 	return 0;
 }

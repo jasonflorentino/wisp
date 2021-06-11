@@ -435,6 +435,30 @@ wval* builtin_div(wenv* e, wval* a) {
 	return builtin_op(e, a, "/");
 }
 
+wval* builtin_def(wenv* e, wval* a)
+{
+	WASSERT(a, a->cell[0]->type == WVAL_QEXPR,
+		"Function 'def' received incorrect type!");
+
+	wval* syms = a->cell[0];
+	for (int i = 0; i < syms->count; i++)
+	{
+		WASSERT(a, syms->cell[i]->type == WVAL_SYM,
+			"Function 'def' cannot define non-symbol!");
+	}
+
+	WASSERT(a, syms->count == a->count-1,
+		"Function 'def' cannot define incorrect "
+		"number of values to symbols!");
+
+	for (int i = 0; i < syms->count; i++) {
+		wenv_put(e, syms->cell[i], a->cell[i+1]);
+	}
+
+	wval_del(a);
+	return wval_sexpr();
+}
+
 void wenv_add_builtin(wenv* e, char* name, wbuiltin func)
 {
 	wval* k = wval_sym(name);
@@ -451,13 +475,13 @@ void wenv_add_builtins(wenv* e)
 	wenv_add_builtin(e, "tail", builtin_tail);
 	wenv_add_builtin(e, "eval", builtin_eval);
 	wenv_add_builtin(e, "join", builtin_join);
+	wenv_add_builtin(e, "def",  builtin_def);
 
 	wenv_add_builtin(e, "+", builtin_add);
 	wenv_add_builtin(e, "-", builtin_sub);
 	wenv_add_builtin(e, "*", builtin_mul);
 	wenv_add_builtin(e, "/", builtin_div);
 }
-
 /**
  * `wval_eval_sexp` takes an `wval*` and transforms it to a new `wval*`
  * First evaluate the children. If there are any errors, return the first

@@ -41,7 +41,11 @@ struct wval
 	long num;
 	char* err;
 	char* sym;
-	wbuiltin fun;
+
+	wbuiltin builtin;
+	wenv* env;
+	wval* formals;
+	wval* body;
 
 	int count;
 	wval** cell;
@@ -86,7 +90,7 @@ wval* wval_fun(wbuiltin func)
 {
 	wval* v = malloc(sizeof(wval));
 	v->type = WVAL_FUN;
-	v->fun = func;
+	v->builtin = func;
 	return v;
 }
 
@@ -108,12 +112,34 @@ wval* wval_qexpr(void)
 	return v;
 }
 
+wenv* wenv_new(void);
+
+wval* wval_lambda(wval* formals, wval* body)
+{
+	wval* v = malloc(sizeof(wval));
+	v->type = WVAL_FUN;
+	v->builtin = NULL;
+	v->env = wenv_new();
+	v->formals = formals;
+	v->body = body;
+	return v;
+}
+
+void wenv_del(wenv* e);
+
 void wval_del(wval* v)
 {
 	switch (v->type)
 	{
 		case WVAL_NUM: break;
-		case WVAL_FUN: break;
+		case WVAL_FUN: 
+			if (!v->builtin) 
+			{
+				wenv_del(v->env);
+				wval_del(v->formals);
+				wval_del(v->body);
+			}
+			break;
 		case WVAL_ERR: free(v->err); break;
 		case WVAL_SYM: free(v->sym); break;
 		case WVAL_QEXPR:
@@ -127,6 +153,8 @@ void wval_del(wval* v)
 	free(v);
 }
 
+wenv* wenv_copy(wenv* e);
+
 wval* wval_copy(wval* v)
 {
 	wval* x = malloc(sizeof(wval));
@@ -134,7 +162,16 @@ wval* wval_copy(wval* v)
 
 	switch (v->type)
 	{
-		case WVAL_FUN: x->fun = v->fun; break;
+		case WVAL_FUN: 
+			if (v->builtin) {
+				x->builtin = v->builtin;
+			} else {
+				x->builtin = NULL;
+				x->env = wenv_copy(v->env);
+				x->formals = wval_copy(v->formals);
+				x->body = wval_copy(v->body);
+			}
+			break;
 		case WVAL_NUM: x->num = v->num; break;
 		case WVAL_ERR:
 			x->err = malloc(strlen(v->err) + 1);
@@ -223,7 +260,14 @@ void wval_print(wval* v)
 	{
 		case WVAL_NUM:   printf("%li", v->num); break;
 		case WVAL_ERR:   printf("Error: %s", v->err); break;
-		case WVAL_FUN:   printf("<function>"); break;
+		case WVAL_FUN:
+			if (v->builtin) {
+				printf("<builtin>");
+			} else {
+				printf("(\\ "); wval_print(v->formals);
+				putchar(' '); wval_print(v->body); putchar(')');
+			}
+			break;
 		case WVAL_SYM:	 printf("%s", v->sym); break;
 		case WVAL_SEXPR: wval_expr_print(v, '(', ')'); break;
 		case WVAL_QEXPR: wval_expr_print(v, '{', '}'); break;
@@ -257,6 +301,7 @@ char* wtype_name(int t)
 
 struct wenv
 {
+	wenv* par;
 	int count;
 	char** syms;
 	wval** vals;
@@ -265,6 +310,7 @@ struct wenv
 wenv* wenv_new(void)
 {
 	wenv* e = malloc(sizeof(wenv));
+	e->par = NULL;
 	e->count = 0;
 	e->syms = NULL;
 	e->vals = NULL;
@@ -290,9 +336,31 @@ wval* wenv_get(wenv* e, wval* k)
 			return wval_copy(e->vals[i]);
 		}
 	}
-	return wval_err("Unbound symbol `%s`", k->sym);
+	
+	if (e->par) {
+		return wenv_get(e->par, k);
+	} else {
+		return wval_err("Unbound symbol `%s`", k->sym);
+	}
 }
 
+wenv* wenv_copy(wenv* e)
+{
+	wenv* n = malloc(sizeof(wenv));
+	n->par = e->par;
+	n->count = e->count;
+	n->syms = malloc(sizeof(char*) * n->count);
+	n->vals = malloc(sizeof(wval*) * n->count);
+	for (int i = 0; i < e->count; i++)
+	{
+		n->syms[i] = malloc(strlen(e->syms[i]) + 1);
+		strcpy(n->syms[i], e->syms[i]);
+		n->vals[i] = wval_copy(e->vals[i]);
+	}
+	return n;
+}
+
+/* For variable definition in loval env */
 void wenv_put(wenv* e, wval* k, wval* v)
 {
 	for (int i = 0; i < e->count; i++) {
@@ -311,6 +379,13 @@ void wenv_put(wenv* e, wval* k, wval* v)
 	e->vals[e->count-1] = wval_copy(v);
 	e->syms[e->count-1] = malloc(strlen(k->sym)+1);
 	strcpy(e->syms[e->count-1], k->sym);
+}
+
+/* For variable definition in global env */
+void wenv_def(wenv* e, wval* k, wval* v)
+{
+	while (e->par) { e = e->par; }
+	wenv_put(e, k, v);
 }
 
 #define WASSERT(args, cond, fmt, ...) \
@@ -463,7 +538,7 @@ wval* builtin_div(wenv* e, wval* a) {
 	return builtin_op(e, a, "/");
 }
 
-wval* builtin_def(wenv* e, wval* a)
+wval* builtin_var(wenv* e, wval* a, char* func)
 {
 	WASSERT_TYPE("def", a, 0, WVAL_QEXPR);
 
@@ -471,23 +546,61 @@ wval* builtin_def(wenv* e, wval* a)
 	for (int i = 0; i < syms->count; i++)
 	{
 		WASSERT(a, (syms->cell[i]->type == WVAL_SYM),
-			"Function 'def' cannot define non-symbol! ",
-			"Got %s, Expected %s.",
-			wtype_name(syms->cell[i]->type), wtype_name(WVAL_SYM));
+			"Function '%s' cannot define non-symbol! ",
+			"Got %s, Expected %s.", func,
+			wtype_name(syms->cell[i]->type), 
+			wtype_name(WVAL_SYM));
 	}
 
 	WASSERT(a, (syms->count == a->count-1),
-		"Function 'def' passed incorrect number of arguments for symbols. "
+		"Function '%s' passed incorrect number of arguments for symbols. "
 		"Got %i, Expected %i.",
-		syms->count, a->count-1);
+		func, syms->count, a->count-1);
 
-	for (int i = 0; i < syms->count; i++) {
-		wenv_put(e, syms->cell[i], a->cell[i+1]);
+	for (int i = 0; i < syms->count; i++) 
+	{
+		if (strcmp(func, "def") == 0) {
+			wenv_def(e, syms->cell[i], a->cell[i+1]);
+		}
+
+		if (strcmp(func, "=")   == 0) {
+			wenv_put(e, syms->cell[i], a->cell[i+1]);
+		}
 	}
 
 	wval_del(a);
 	return wval_sexpr();
 }
+
+wval* builtin_def(wenv* e, wval* a)
+{
+	return builtin_var(e, a, "def");
+}
+
+wval* builtin_put(wenv* e, wval* a)
+{
+	return builtin_var(e, a, "=");
+}
+
+wval* builtin_lambda(wenv* e, wval* a)
+{
+	WASSERT_NUM("\\", a, 2);
+	WASSERT_TYPE("\\", a, 0, WVAL_QEXPR);
+	WASSERT_TYPE("\\", a, 1, WVAL_QEXPR);
+
+	for (int i = 0; i < a->cell[0]->count; i++)
+	{
+		WASSERT(a, (a->cell[0]->cell[i]->type == WVAL_SYM),
+			"Cannot define non-symbol. Got %s, Expected %s",
+			wtype_name(a->cell[0]->cell[i]->type), wtype_name(WVAL_SYM));
+	}
+	
+	wval* formals =  wval_pop(a, 0);
+	wval* body = wval_pop(a, 0);
+	wval_del(a);
+
+	return wval_lambda(formals, body);
+} 
 
 void wenv_add_builtin(wenv* e, char* name, wbuiltin func)
 {
@@ -506,12 +619,82 @@ void wenv_add_builtins(wenv* e)
 	wenv_add_builtin(e, "eval", builtin_eval);
 	wenv_add_builtin(e, "join", builtin_join);
 	wenv_add_builtin(e, "def",  builtin_def);
+	wenv_add_builtin(e, "=",    builtin_put);
+	wenv_add_builtin(e, "\\",   builtin_lambda);
 
 	wenv_add_builtin(e, "+", builtin_add);
 	wenv_add_builtin(e, "-", builtin_sub);
 	wenv_add_builtin(e, "*", builtin_mul);
 	wenv_add_builtin(e, "/", builtin_div);
 }
+
+wval* wval_call(wenv* e, wval* f, wval* a)
+{
+	if (f->builtin) { return f->builtin(e, a); }
+	
+	int given = a->count;
+	int total = f->formals->count;
+
+	while (a->count)
+	{
+		if (f->formals->count == 0)
+		{
+			wval_del(a); 
+			return wval_err(
+				"Function passed too many arguments. "
+				"Got %i, Expected %i.", given, total);
+		}
+		
+		wval* sym = wval_pop(f->formals, 0);
+		
+		if (strcmp(sym->sym, "&") == 0)
+		{
+			if (f->formals->count != 1)
+			{
+				wval_del(a);
+				return wval_err("Function format invalid. "
+					"Symbol '&' not followed by single symbol.");
+			}
+			
+			wval* nsym = wval_pop(f->formals, 0);
+			wenv_put(f->env, nsym, builtin_list(e, a));
+			wval_del(sym); wval_del(nsym);
+			break;
+		}
+		
+		wval* val = wval_pop(a, 0);
+		wenv_put(f->env, sym, val);
+		wval_del(sym); wval_del(val);
+	}
+
+	wval_del(a);
+	
+	if (f->formals->count > 0 &&
+		strcmp(f->formals->cell[0]->sym, "&") == 0)
+	{
+		if (f->formals->count != 2) {
+			return wval_err("Function format invalid. "
+				"Symbol '&' not followed by single symbol.");
+		}
+		
+		wval_del(wval_pop(f->formals, 0));
+
+		wval* sym = wval_pop(f->formals, 0);
+		wval* val = wval_qexpr();
+
+		wenv_put(f->env, sym, val);
+		wval_del(sym); wval_del(val);
+	}
+
+	if (f->formals->count == 0) {
+		f->env->par = e;
+		return builtin_eval(
+			f->env, wval_add(wval_sexpr(), wval_copy(f->body)));
+	} else {
+		return wval_copy(f);
+	}
+}
+
 /**
  * `wval_eval_sexp` takes an `wval*` and transforms it to a new `wval*`
  * First evaluate the children. If there are any errors, return the first
@@ -536,12 +719,16 @@ wval* wval_eval_sexpr(wenv* e, wval* v)
 	wval* f = wval_pop(v, 0);
 	if (f->type != WVAL_FUN)
 	{
+		wval* err = wval_err(
+			"S-Expression starts with incorrect type. "
+			"Got %s, Expected %s.",
+			wtype_name(f->type), wtype_name(WVAL_FUN));
 		wval_del(f);
 		wval_del(v);
-		return wval_err("First element is not a function!");
+		return err;
 	}
 
-	wval* result = f->fun(e, v);
+	wval* result = wval_call(e, f, v);
 	wval_del(f);
 	return result;
 }
@@ -626,7 +813,7 @@ int main(int argc, char** argv)
 	
 	puts("\n Wispy Version 0.0.0.0.5");
 	puts(" A lisp-y language by Jason");
-	puts(" Made with the help of buildyourownlisp.com by Daniel Holden");
+	puts(" Made reading buildyourownlisp.com by Daniel Holden");
 	puts(" Press Ctrl+C to exit\n");
 
 	wenv* e = wenv_new();

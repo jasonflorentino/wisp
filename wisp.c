@@ -240,6 +240,34 @@ wval* wval_join(wval* x, wval* y)
 	return x;
 }
 
+int wval_eq(wval* x, wval* y)
+{
+	if (x->type != y->type) { return 0; }
+
+	switch (x->type)
+	{
+		case WVAL_NUM: return (x->num == y->num);
+		case WVAL_ERR: return (strcmp(x->err, y->err) == 0);
+		case WVAL_SYM: return (strcmp(x->sym, y->sym) == 0);
+		case WVAL_FUN:
+			if (x->builtin || y->builtin) {
+				return x->builtin == y->builtin;
+			} else {
+				return wval_eq(x->formals, y->formals)
+				    && wval_eq(x->body, y->body);
+			}
+		case WVAL_QEXPR:
+		case WVAL_SEXPR:
+			if (x->count != y->count) { return 0; }
+			for (int i = 0; i < x->count; i++) {
+				if (!wval_eq(x->cell[i], y->cell[i])) { return 0; }
+			}
+			return 1;
+		break;
+	}
+	return 0;
+}
+
 void wval_print(wval* v);
 void wval_expr_print(wval* v, char open, char close)
 {
@@ -602,6 +630,94 @@ wval* builtin_lambda(wenv* e, wval* a)
 	return wval_lambda(formals, body);
 } 
 
+wval* builtin_ord(wenv* e, wval* a, char* op)
+{
+	WASSERT_NUM(op, a, 2);
+	WASSERT_TYPE(op, a, 0, WVAL_NUM);
+	WASSERT_TYPE(op, a, 1, WVAL_NUM);
+
+	int r;
+	if (strcmp(op, ">")  == 0) {
+		r = (a->cell[0]->num >  a->cell[1]->num);
+	}
+	if (strcmp(op, "<")  == 0) {
+		r = (a->cell[0]->num <  a->cell[1]->num);
+	}
+	if (strcmp(op, ">=") == 0) {
+		r = (a->cell[0]->num >= a->cell[1]->num);
+	}
+	if (strcmp(op, "<=") == 0) {
+		r = (a->cell[0]->num <= a->cell[1]->num);
+	}
+	wval_del(a);
+	return wval_num(r);
+}
+
+wval* builtin_gt(wenv* e, wval* a)
+{
+	return builtin_ord(e, a, ">");
+}
+
+wval* builtin_lt(wenv* e, wval* a)
+{
+	return builtin_ord(e, a, "<");
+}
+
+wval* builtin_ge(wenv* e, wval* a)
+{
+	return builtin_ord(e, a, ">=");
+}
+
+wval* builtin_le(wenv* e, wval* a)
+{
+	return builtin_ord(e, a, "<=");
+}
+
+wval* builtin_cmp(wenv* e, wval* a, char* op)
+{
+	WASSERT_NUM(op, a, 2);
+	int r;
+	if (strcmp(op, "==") == 0) {
+		r =  wval_eq(a->cell[0], a->cell[1]);
+	}
+	if (strcmp(op, "!=") == 0) {
+		r = !wval_eq(a->cell[0], a->cell[1]);
+	}
+	wval_del(a);
+	return wval_num(r);
+}
+
+wval* builtin_eq(wenv* e, wval* a) 
+{
+	return builtin_cmp(e, a, "==");
+}
+
+wval* builtin_ne(wenv* e, wval* a) 
+{
+	return builtin_cmp(e, a, "!=");
+}
+
+wval* builtin_if(wenv* e, wval* a)
+{
+	WASSERT_NUM("if",  a, 3);
+	WASSERT_TYPE("if", a, 0, WVAL_NUM);
+	WASSERT_TYPE("if", a, 1, WVAL_QEXPR);
+	WASSERT_TYPE("if", a, 2, WVAL_QEXPR);
+
+	wval* x;
+	a->cell[1]->type = WVAL_SEXPR;
+	a->cell[2]->type = WVAL_SEXPR;
+
+	if (a->cell[0]->num) {
+		x = wval_eval(e, wval_pop(a, 1));
+	} else {
+		x = wval_eval(e, wval_pop(a, 2));
+	}
+	
+	wval_del(a);
+	return x;
+}
+
 void wenv_add_builtin(wenv* e, char* name, wbuiltin func)
 {
 	wval* k = wval_sym(name);
@@ -626,6 +742,14 @@ void wenv_add_builtins(wenv* e)
 	wenv_add_builtin(e, "-", builtin_sub);
 	wenv_add_builtin(e, "*", builtin_mul);
 	wenv_add_builtin(e, "/", builtin_div);
+	
+	wenv_add_builtin(e, "if", builtin_if);
+	wenv_add_builtin(e, "==", builtin_eq);
+	wenv_add_builtin(e, "!=", builtin_ne);
+	wenv_add_builtin(e, ">",  builtin_gt);
+	wenv_add_builtin(e, "<",  builtin_lt);
+	wenv_add_builtin(e, ">=", builtin_ge);
+	wenv_add_builtin(e, "<=", builtin_le);
 }
 
 wval* wval_call(wenv* e, wval* f, wval* a)

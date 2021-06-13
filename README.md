@@ -1,7 +1,7 @@
 # 👻 Wisp (wip)
 ### ***A Lisp-y language made reading [buildyourownlisp.com](http://www.buildyourownlisp.com/) by [Daniel Holden](https://github.com/orangeduck)***
 
-I was looking for some resources to learn more about C and came across this wonderful project. In fifteen short but meaningful chapters, Daniel walks you through building a language from scratch. I highly recommend it for anyone interested in C or the inner workings of programming languages. While I can't say I could roll some of the features he teaches on my own yet, I certainly feel more comfortable in my knowledge of C programs and learned some excellent foundations on the design of programming languges. Thanks Daniel!
+I was looking for some resources to learn more about C and came across this wonderful project. In fifteen short but meaningful chapters, Daniel walks you through building a language from scratch. I highly recommend it for anyone interested in C or the inner workings of programming languages. While I can't say I could roll some of the features he teaches on my own yet, I certainly feel more comfortable in my knowledge of C programs and learned some excellent foundations on the design of programming languages. Thanks Daniel!
 
 —Jason  
 June 2021
@@ -22,6 +22,8 @@ Wisp is a [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language))-like
 - Number, Symbol, and Function types
 - Variables
 - Custom functions
+- Arithmetic and Comparison operators
+- Conditional statements
 
 
 ## Dependencies

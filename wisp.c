@@ -24,12 +24,27 @@ void add_history(char* unused)
 #include <editline/readline.h>
 #endif
 
+/* Parser declarations */
+
+mpc_parser_t* Number;
+mpc_parser_t* Symbol;
+mpc_parser_t* String;
+mpc_parser_t* Comment;
+mpc_parser_t* Sexpr;
+mpc_parser_t* Qexpr;
+mpc_parser_t* Expr;
+mpc_parser_t* Wispy;
+
+/* Forward declarations */
+
 struct wval;
 struct wenv;
 typedef struct wval wval;
 typedef struct wenv wenv;
 
-enum { WVAL_ERR, WVAL_NUM,   WVAL_SYM, 
+/* Wisp Value */
+
+enum { WVAL_ERR, WVAL_NUM,   WVAL_SYM, WVAL_STR, 
        WVAL_FUN, WVAL_SEXPR, WVAL_QEXPR };
 
 typedef wval*(*wbuiltin)(wenv*, wval*);
@@ -37,20 +52,23 @@ typedef wval*(*wbuiltin)(wenv*, wval*);
 struct wval 
 {
 	int type;
-
+	
+	/* Basic */
 	long num;
 	char* err;
 	char* sym;
+	char* str;
 
+	/* Function */
 	wbuiltin builtin;
 	wenv* env;
 	wval* formals;
 	wval* body;
 
+	/* Expression */
 	int count;
 	wval** cell;
 };
-
 
 wval* wval_err(char* fmt, ...)
 {
@@ -86,7 +104,16 @@ wval* wval_sym(char* s)
 	return v;
 }
 
-wval* wval_fun(wbuiltin func)
+wval* wval_str(char *s)
+{
+	wval* v = malloc(sizeof(wval));
+	v->type = WVAL_STR;
+	v->str = malloc(strlen(s) + 1);
+	strcpy(v->str, s);
+	return v;
+}
+
+wval* wval_builtin(wbuiltin func)
 {
 	wval* v = malloc(sizeof(wval));
 	v->type = WVAL_FUN;
@@ -142,6 +169,7 @@ void wval_del(wval* v)
 			break;
 		case WVAL_ERR: free(v->err); break;
 		case WVAL_SYM: free(v->sym); break;
+		case WVAL_STR: free(v->str); break;
 		case WVAL_QEXPR:
 		case WVAL_SEXPR:
 			for (int i = 0; i < v->count; i++) {
@@ -179,6 +207,9 @@ wval* wval_copy(wval* v)
 		case WVAL_SYM:
 			x->sym = malloc(strlen(v->sym) + 1);
 			strcpy(x->sym, v->sym); break;
+		case WVAL_STR:
+			x->str = malloc(strlen(v->str) +1);
+			strcpy(x->str, v->str); break;
 		case WVAL_SEXPR:
 		case WVAL_QEXPR:
 			x->count = v->count;
@@ -249,6 +280,7 @@ int wval_eq(wval* x, wval* y)
 		case WVAL_NUM: return (x->num == y->num);
 		case WVAL_ERR: return (strcmp(x->err, y->err) == 0);
 		case WVAL_SYM: return (strcmp(x->sym, y->sym) == 0);
+		case WVAL_STR: return (strcmp(x->str, y->str) == 0);
 		case WVAL_FUN:
 			if (x->builtin || y->builtin) {
 				return x->builtin == y->builtin;
@@ -266,6 +298,15 @@ int wval_eq(wval* x, wval* y)
 		break;
 	}
 	return 0;
+}
+
+void wval_print_str(wval* v)
+{
+	char* escaped = malloc(strlen(v->str) + 1);
+	strcpy(escaped, v->str);
+	escaped = mpcf_escape(escaped);
+	printf("\"%s\"", escaped);
+	free(escaped);
 }
 
 void wval_print(wval* v);
@@ -288,6 +329,10 @@ void wval_print(wval* v)
 	{
 		case WVAL_NUM:   printf("%li", v->num); break;
 		case WVAL_ERR:   printf("Error: %s", v->err); break;
+		case WVAL_SYM:	 printf("%s", v->sym); break;
+		case WVAL_STR:   wval_print_str(v); break;
+		case WVAL_SEXPR: wval_expr_print(v, '(', ')'); break;
+		case WVAL_QEXPR: wval_expr_print(v, '{', '}'); break;
 		case WVAL_FUN:
 			if (v->builtin) {
 				printf("<builtin>");
@@ -296,9 +341,6 @@ void wval_print(wval* v)
 				putchar(' '); wval_print(v->body); putchar(')');
 			}
 			break;
-		case WVAL_SYM:	 printf("%s", v->sym); break;
-		case WVAL_SEXPR: wval_expr_print(v, '(', ')'); break;
-		case WVAL_QEXPR: wval_expr_print(v, '{', '}'); break;
 	}
 }
 
@@ -313,19 +355,17 @@ char* wtype_name(int t)
 {
 	switch(t)
 	{
-		case WVAL_FUN: return "Function";
-		case WVAL_NUM: return "Number";
-		case WVAL_ERR: return "Error";
-		case WVAL_SYM: return "Symbol";
+		case WVAL_FUN:   return "Function";
+		case WVAL_NUM:   return "Number";
+		case WVAL_ERR:   return "Error";
+		case WVAL_SYM:   return "Symbol";
+		case WVAL_STR:   return "String";
 		case WVAL_SEXPR: return "S-Expression";
 		case WVAL_QEXPR: return "Q-Expression";
-		default: return "Unknown";
+		default:         return "Unknown";
 	}
 }
-
-/**
- * Wisp Environment
- */
+/* Wisp Environment */
 
 struct wenv
 {
@@ -415,6 +455,8 @@ void wenv_def(wenv* e, wval* k, wval* v)
 	while (e->par) { e = e->par; }
 	wenv_put(e, k, v);
 }
+
+/* Builtins */
 
 #define WASSERT(args, cond, fmt, ...) \
 	if (!(cond)) { \
@@ -511,13 +553,6 @@ wval* builtin_eval(wenv* e, wval* a)
 	return wval_eval(e, x);
 }
 
-/**
- * `builtin_op` handles evaluation. First ensure all arguments are numbers
- * then pop first argument. If there are no more sub-expressions and the
- * operator is subtraction, perform unary negation. If there are more
- * arguments, continue popping and performing necessary operations.
- * If no errors, delete arguments and return new expression.
- */
 wval* builtin_op(wenv* e, wval* a, char* op)
 {
 	for (int i = 0; i < a->count; i++) {
@@ -550,21 +585,10 @@ wval* builtin_op(wenv* e, wval* a, char* op)
 	return x;
 }
 
-wval* builtin_add(wenv* e, wval* a) {
-	return builtin_op(e, a, "+");
-}
-
-wval* builtin_sub(wenv* e, wval* a) {
-	return builtin_op(e, a, "-");
-}
-
-wval* builtin_mul(wenv* e, wval* a) {
-	return builtin_op(e, a, "*");
-}
-
-wval* builtin_div(wenv* e, wval* a) {
-	return builtin_op(e, a, "/");
-}
+wval* builtin_add(wenv* e, wval* a) { return builtin_op(e, a, "+"); }
+wval* builtin_sub(wenv* e, wval* a) { return builtin_op(e, a, "-"); }
+wval* builtin_mul(wenv* e, wval* a) { return builtin_op(e, a, "*"); }
+wval* builtin_div(wenv* e, wval* a) { return builtin_op(e, a, "/"); }
 
 wval* builtin_var(wenv* e, wval* a, char* func)
 {
@@ -600,15 +624,8 @@ wval* builtin_var(wenv* e, wval* a, char* func)
 	return wval_sexpr();
 }
 
-wval* builtin_def(wenv* e, wval* a)
-{
-	return builtin_var(e, a, "def");
-}
-
-wval* builtin_put(wenv* e, wval* a)
-{
-	return builtin_var(e, a, "=");
-}
+wval* builtin_def(wenv* e, wval* a) { return builtin_var(e, a, "def"); }
+wval* builtin_put(wenv* e, wval* a) { return builtin_var(e, a, "="); }
 
 wval* builtin_lambda(wenv* e, wval* a)
 {
@@ -637,65 +654,31 @@ wval* builtin_ord(wenv* e, wval* a, char* op)
 	WASSERT_TYPE(op, a, 1, WVAL_NUM);
 
 	int r;
-	if (strcmp(op, ">")  == 0) {
-		r = (a->cell[0]->num >  a->cell[1]->num);
-	}
-	if (strcmp(op, "<")  == 0) {
-		r = (a->cell[0]->num <  a->cell[1]->num);
-	}
-	if (strcmp(op, ">=") == 0) {
-		r = (a->cell[0]->num >= a->cell[1]->num);
-	}
-	if (strcmp(op, "<=") == 0) {
-		r = (a->cell[0]->num <= a->cell[1]->num);
-	}
+	if (strcmp(op, ">")  == 0) { r = (a->cell[0]->num >  a->cell[1]->num); }
+	if (strcmp(op, "<")  == 0) { r = (a->cell[0]->num <  a->cell[1]->num); }
+	if (strcmp(op, ">=") == 0) { r = (a->cell[0]->num >= a->cell[1]->num); }
+	if (strcmp(op, "<=") == 0) { r = (a->cell[0]->num <= a->cell[1]->num); }
 	wval_del(a);
 	return wval_num(r);
 }
 
-wval* builtin_gt(wenv* e, wval* a)
-{
-	return builtin_ord(e, a, ">");
-}
-
-wval* builtin_lt(wenv* e, wval* a)
-{
-	return builtin_ord(e, a, "<");
-}
-
-wval* builtin_ge(wenv* e, wval* a)
-{
-	return builtin_ord(e, a, ">=");
-}
-
-wval* builtin_le(wenv* e, wval* a)
-{
-	return builtin_ord(e, a, "<=");
-}
+wval* builtin_gt(wenv* e, wval* a) { return builtin_ord(e, a, ">");  }
+wval* builtin_lt(wenv* e, wval* a) { return builtin_ord(e, a, "<");  }
+wval* builtin_ge(wenv* e, wval* a) { return builtin_ord(e, a, ">="); }
+wval* builtin_le(wenv* e, wval* a) { return builtin_ord(e, a, "<="); }
 
 wval* builtin_cmp(wenv* e, wval* a, char* op)
 {
 	WASSERT_NUM(op, a, 2);
 	int r;
-	if (strcmp(op, "==") == 0) {
-		r =  wval_eq(a->cell[0], a->cell[1]);
-	}
-	if (strcmp(op, "!=") == 0) {
-		r = !wval_eq(a->cell[0], a->cell[1]);
-	}
+	if (strcmp(op, "==") == 0) { r =  wval_eq(a->cell[0], a->cell[1]); }
+	if (strcmp(op, "!=") == 0) { r = !wval_eq(a->cell[0], a->cell[1]); }
 	wval_del(a);
 	return wval_num(r);
 }
 
-wval* builtin_eq(wenv* e, wval* a) 
-{
-	return builtin_cmp(e, a, "==");
-}
-
-wval* builtin_ne(wenv* e, wval* a) 
-{
-	return builtin_cmp(e, a, "!=");
-}
+wval* builtin_eq(wenv* e, wval* a) { return builtin_cmp(e, a, "=="); }
+wval* builtin_ne(wenv* e, wval* a) { return builtin_cmp(e, a, "!="); }
 
 wval* builtin_if(wenv* e, wval* a)
 {
@@ -718,10 +701,70 @@ wval* builtin_if(wenv* e, wval* a)
 	return x;
 }
 
+wval* wval_read(mpc_ast_t* t);
+
+wval* builtin_load(wenv* e, wval* a)
+{
+	WASSERT_NUM("load", a, 1);
+	WASSERT_TYPE("load", a, 0, WVAL_STR);
+
+	mpc_result_t r;
+	if (mpc_parse_contents(a->cell[0]->str, Wispy, &r))
+	{
+		wval* expr = wval_read(r.output);
+		mpc_ast_delete(r.output);
+
+		while (expr->count)
+		{
+			wval* x = wval_eval(e, wval_pop(expr, 0));
+			if (x->type == WVAL_ERR) { wval_println(x); }
+			wval_del(x);
+		}
+
+		wval_del(expr);
+		wval_del(a);
+		
+		return wval_sexpr();
+	}
+	else
+	{
+		char* err_msg = mpc_err_string(r.error);
+		mpc_err_delete(r.error);
+
+		wval* err = wval_err("Could not load Library %s", err_msg);
+		free(err_msg);
+		wval_del(a);
+	
+		return err;
+	}
+}
+
+wval* builtin_print(wenv* e, wval* a)
+{
+	for (int i = 0; i < a->count; i++) {
+		wval_print(a->cell[i]); putchar(' ');
+	}
+	putchar('\n');
+	wval_del(a);
+
+	return wval_sexpr();
+}
+
+wval* builtin_error(wenv* e, wval* a)
+{
+	WASSERT_NUM("error", a, 1);
+	WASSERT_TYPE("error", a, 0, WVAL_STR);
+
+	wval* err = wval_err(a->cell[0]->str);
+	
+	wval_del(a);
+	return err;
+}
+
 void wenv_add_builtin(wenv* e, char* name, wbuiltin func)
 {
 	wval* k = wval_sym(name);
-	wval* v = wval_fun(func);
+	wval* v = wval_builtin(func);
 	wenv_put(e, k, v);
 	wval_del(k);
 	wval_del(v);
@@ -729,20 +772,25 @@ void wenv_add_builtin(wenv* e, char* name, wbuiltin func)
 
 void wenv_add_builtins(wenv* e)
 {
+	/* Variable functions */
+	wenv_add_builtin(e, "def", builtin_def);
+	wenv_add_builtin(e, "=",   builtin_put);
+	wenv_add_builtin(e, "\\",  builtin_lambda);
+
+	/* List functions */
 	wenv_add_builtin(e, "list", builtin_list);
 	wenv_add_builtin(e, "head", builtin_head);
 	wenv_add_builtin(e, "tail", builtin_tail);
 	wenv_add_builtin(e, "eval", builtin_eval);
 	wenv_add_builtin(e, "join", builtin_join);
-	wenv_add_builtin(e, "def",  builtin_def);
-	wenv_add_builtin(e, "=",    builtin_put);
-	wenv_add_builtin(e, "\\",   builtin_lambda);
-
+	
+	/* Math functions */
 	wenv_add_builtin(e, "+", builtin_add);
 	wenv_add_builtin(e, "-", builtin_sub);
 	wenv_add_builtin(e, "*", builtin_mul);
 	wenv_add_builtin(e, "/", builtin_div);
 	
+	/* Comparison functions */
 	wenv_add_builtin(e, "if", builtin_if);
 	wenv_add_builtin(e, "==", builtin_eq);
 	wenv_add_builtin(e, "!=", builtin_ne);
@@ -750,7 +798,14 @@ void wenv_add_builtins(wenv* e)
 	wenv_add_builtin(e, "<",  builtin_lt);
 	wenv_add_builtin(e, ">=", builtin_ge);
 	wenv_add_builtin(e, "<=", builtin_le);
+	
+	/* String functions */
+	wenv_add_builtin(e, "load",  builtin_load);
+	wenv_add_builtin(e, "error", builtin_error);
+	wenv_add_builtin(e, "print", builtin_print);
 }
+
+/* Evaluation */
 
 wval* wval_call(wenv* e, wval* f, wval* a)
 {
@@ -819,13 +874,6 @@ wval* wval_call(wenv* e, wval* f, wval* a)
 	}
 }
 
-/**
- * `wval_eval_sexp` takes an `wval*` and transforms it to a new `wval*`
- * First evaluate the children. If there are any errors, return the first
- * error using `wval_take`. If there are no children return it directly.
- * Then if single single expression, return it contained in parenthesis.
- * Else we have a valid expression with more than one child.
- */
 wval* wval_eval_sexpr(wenv* e, wval* v)
 {
 	for (int i = 0; i < v->count; i++) {
@@ -838,7 +886,7 @@ wval* wval_eval_sexpr(wenv* e, wval* v)
 	}
 
 	if (v->count == 0) { return v; }
-	if (v->count == 1) { return wval_take(v, 0); }
+	if (v->count == 1) { return wval_eval(e, wval_take(v, 0)); }
 	
 	wval* f = wval_pop(v, 0);
 	if (f->type != WVAL_FUN)
@@ -871,30 +919,31 @@ wval* wval_eval(wenv* e, wval* v)
 	return v;
 }
 
-/* Custom exponentiation function */
-long power(long base, long exp)
-{
-	if (exp == 0) {
-		return 1;
-	} else if (exp % 2) {
-		return base * power(base, exp - 1);
-	} else {
-		long temp = power(base, exp / 2);
-		return temp * temp;
-	}
-}
+/* Reading */
 
 wval* wval_read_num(mpc_ast_t* t)
 {
 	errno = 0;
 	long x = strtol(t->contents, NULL, 10);
 	return errno != ERANGE ?
-		wval_num(x) : wval_err("invalid number");
+		wval_num(x) : wval_err("Invalid number");
+}
+
+wval* wval_read_str(mpc_ast_t* t)
+{
+	t->contents[strlen(t->contents)-1] = '\0';
+	char* unescaped = malloc(strlen(t->contents+1)+1);
+	strcpy(unescaped, t->contents+1);
+	unescaped = mpcf_unescape(unescaped);
+	wval* str = wval_str(unescaped);
+	free(unescaped);
+	return str;
 }
 
 wval* wval_read(mpc_ast_t* t)
 {
 	if (strstr(t->tag, "number")) { return wval_read_num(t); }
+	if (strstr(t->tag, "string")) { return wval_read_str(t); }
 	if (strstr(t->tag, "symbol")) { return wval_sym(t->contents); }
 
 	wval* x = NULL;
@@ -909,61 +958,102 @@ wval* wval_read(mpc_ast_t* t)
 		if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
 		if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
 		if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
+		if (strstr(t->children[i]->tag, "comment")) { continue; }
 		x = wval_add(x, wval_read(t->children[i]));
 	}
 	
 	return x;
 }
 
+
+/* Custom exponentiation function */
+long power(long base, long exp)
+{
+	if (exp == 0) {
+		return 1;
+	} else if (exp % 2) {
+		return base * power(base, exp - 1);
+	} else {
+		long temp = power(base, exp / 2);
+		return temp * temp;
+	}
+}
+
+/* Main */
+
 int main(int argc, char** argv)
 {
-	mpc_parser_t* Number = mpc_new("number");
-	mpc_parser_t* Symbol = mpc_new("symbol");
-	mpc_parser_t* Sexpr  = mpc_new("sexpr");
-	mpc_parser_t* Qexpr  = mpc_new("qexpr");
-	mpc_parser_t* Expr   = mpc_new("expr");
-	mpc_parser_t* Wispy  = mpc_new("wispy");
+	Number  = mpc_new("number");
+	Symbol  = mpc_new("symbol");
+	String  = mpc_new("string");
+	Comment = mpc_new("comment");
+	Sexpr   = mpc_new("sexpr");
+	Qexpr   = mpc_new("qexpr");
+	Expr    = mpc_new("expr");
+	Wispy   = mpc_new("wispy");
 
 	mpca_lang(MPCA_LANG_DEFAULT,
-		"                                                          \
-			number : /-?[0-9]+(\\.[0-9]+)?/ ;                  \
-			symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;        \
-			sexpr  : '(' <expr>* ')' ;                         \
-			qexpr  : '{' <expr>* '}' ;                         \
-			expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
-			wispy  : /^/ <expr>* /$/ ;                         \
+		"                                                    \
+			number  : /-?[0-9]+(\\.[0-9]+)?/ ;           \
+			symbol  : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ; \
+			string  : /\"(\\\\.|[^\"])*\"/ ;             \
+			comment : /;[^\\r\\n]*/ ;                    \
+			sexpr   : '(' <expr>* ')' ;                  \
+			qexpr   : '{' <expr>* '}' ;                  \
+			expr    : <number>  | <symbol> | <string>    \
+			        | <comment> | <sexpr>  | <qexpr> ;   \
+			wispy   : /^/ <expr>* /$/ ;                  \
 		",
-		Number, Symbol, Sexpr, Qexpr, Expr, Wispy);
-	
-	puts("\n Wispy Version 0.0.0.0.5");
-	puts(" A lisp-y language by Jason");
-	puts(" Made reading buildyourownlisp.com by Daniel Holden");
-	puts(" Press Ctrl+C to exit\n");
+		Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Wispy);
 
 	wenv* e = wenv_new();
 	wenv_add_builtins(e);
 
-	while (1)
-	{
-		char* input = readline("wispy~> ");
-		add_history(input);
+	if (argc == 1)
+	{		
+		puts("\n Wispy Version 0.0.6");
+		puts(" A lisp-y language by Jason");
+		puts(" Made reading buildyourownlisp.com by Daniel Holden");
+		puts(" Press Ctrl+C to exit\n");
+	
+		while (1)
+		{
+			char* input = readline("wispy~> ");
+			add_history(input);
 
-		mpc_result_t r;
-		if (mpc_parse("<stdin>", input, Wispy, &r))
-		{
-			wval* x = wval_eval(e, wval_read(r.output));
-			wval_println(x);
-			wval_del(x);
-			mpc_ast_delete(r.output);
-		} 
-		else 
-		{
-			mpc_err_print(r.error);
-			mpc_err_delete(r.error);
+			mpc_result_t r;
+			if (mpc_parse("<stdin>", input, Wispy, &r))
+			{
+				wval* x = wval_eval(e, wval_read(r.output));
+				wval_println(x);
+				wval_del(x);
+				mpc_ast_delete(r.output);
+			} 
+			else 
+			{
+				mpc_err_print(r.error);
+				mpc_err_delete(r.error);
+			}
+			free(input);
 		}
-		free(input);
 	}
+
+	if (argc >= 2)
+	{
+		for (int i = 1; i < argc; i++)
+		{
+			wval* args = wval_add(wval_sexpr(), wval_str(argv[i]));
+			wval* x = builtin_load(e, args);
+			if (x->type == WVAL_ERR) { wval_println(x); }
+			wval_del(x);
+		}
+	}
+
 	wenv_del(e);
-	mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Wispy);
+
+	mpc_cleanup(8,
+		Number, Symbol, String, Comment, 
+		Sexpr,  Qexpr,  Expr,   Wispy);
+
 	return 0;
 }

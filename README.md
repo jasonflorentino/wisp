@@ -1,4 +1,4 @@
-# 👻 Wisp (wip)
+# 👻 Wisp
 ### ***A Lisp-y language made reading [buildyourownlisp.com](http://www.buildyourownlisp.com/) by [Daniel Holden](https://github.com/orangeduck)***
 
 I was looking for some resources to learn more about C and came across this wonderful project. In fourteen short but meaningful chapters, Daniel walks you through building a language from scratch. I highly recommend it for anyone interested in C or the inner workings of programming languages. While I can't say I could roll some of the features he teaches on my own yet, I certainly feel more comfortable in my knowledge of C programs and learned some excellent foundations on the design of programming languages. Thanks Daniel!
@@ -25,6 +25,8 @@ Wisp is a [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language))-like
 - Arithmetic and Comparison operators
 - Conditional statements
 
+## Language Reference
+(Coming)
 
 ## Dependencies
-This repo includes a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](https://github.com/orangeduck/mpc)
+This repo contains a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](https://github.com/orangeduck/mpc)

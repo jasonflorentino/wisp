@@ -6,6 +6,16 @@ I was looking for some resources to learn more about C and came across this wond
 —Jason  
 June 2021
 
+---
+
+- [Installation](#installation)
+- [Language Features](#language-features)
+- [The Basics](#the-basics)
+- [Language Reference](#language-reference)
+- [Dependencies](#dependencies)
+
+---
+
 # Using Wisp
 
 ## Installation

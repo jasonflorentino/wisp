@@ -95,7 +95,7 @@ The eagle-eyed among you might have noticed that the order matters here. The exp
 > greet 13
 < "Good afternoon!"
 > greet time
-> "Good morning!"
+< "Good morning!"
 ```
 
 #### Make a list

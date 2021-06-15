@@ -11,6 +11,7 @@ June 2021
 - [Installation](#installation)
 - [Language Features](#language-features)
 - [The Basics](#the-basics)
+- [Examples](#examples)
 - [Language Reference](#language-reference)
 - [Dependencies](#dependencies)
 
@@ -64,6 +65,61 @@ As you might expect, minus, multiply, and divide are also operators:
 ```
 The eagle-eyed among you might have noticed that the order matters here. The expressions are evaluated from left to right. `(- 1 2 3)` evaluates to `-4`, whereas `(- 2 3 1)` would evaluate to `-2`. `(/ 10 2)`  becomes `5`, but `(/ 2 10)` would be `0`. (Floating point numbers are not yet supported.)
 
+## Examples
+
+#### Write a comment
+```
+> 11 ;Eleven
+< 11
+```
+
+#### Define a variable
+```
+> def {time} 11
+< ()
+> time
+< 11
+```
+
+#### Define a function
+```
+> def {greet} (\ {hour} {
+        if (< hour 12)
+        {print "Good morning!"}
+        {print "Good afternoon!"}
+  }
+```
+
+#### Call the function
+```
+> greet 13
+< "Good afternoon!"
+> greet time
+> "Good morning!"
+```
+
+#### Make a list
+```
+> def {times} {10 11 12 13 14}
+< ()
+> times
+< {10 11 12 13 14}
+```
+
+#### Work with a list
+```
+> head times
+< {10}
+> tail times
+< {11 12 13 14}
+> join {+} (tail times)
+< {+ 11 12 13 14}
+> eval (join {+} (tail times))
+< 50
+> greet (eval (head times))
+< "Good morning!"
+```
+
 ## Language Reference
 
 `42` Number  
@@ -71,10 +127,10 @@ The eagle-eyed among you might have noticed that the order matters here. The exp
 `( )` Symbolic expression (Gets evaluated)  
 `{ }` Quoted expression (Doesn't get evaluated)  
 
-`def` Assigns a value or expression to a symbol. `(def {big} 100)` assigns the value `100` to `big`. 
-
-Lists can be made by putting values in a Quoted expression: `{1 2 3 4 5}`  
-`(def {myList} {1 2 3 4 5})` assigns `myList` to be the Q-expression `{1 2 3 4 5}`
+`def` Assigns a value or expression to a symbol  
+`\` Defines a function. Eg: `\ {params} {body}`  
+`;` Starts a comment until end of the line  
+`print` Prints value to screen
 
 ### Math operators
 ` + ` Adds elements  
@@ -85,16 +141,17 @@ Lists can be made by putting values in a Quoted expression: `{1 2 3 4 5}`
 ### Conditional operators
 ` > ` Returns `1` if the first element is greater than the second. `0` otherwise.  
 ` < ` Returns `1` if the first element is less than the second. `0` otherwise.  
-`>= ` Returns `1` if the first element is greater than or equal to the second. `0` otherwise.  
-`<= ` Returns `1` if the first element is less than or equal to the second. `0` otherwise.  
-`== ` Returns `1` if two elements are equal. `0` otherwise.  
-`!= ` Returns `1` if two elements aren't equal. `0` otherwise.  
-`if ` Returns the first value if the condition is true and the second value if it's false. `(if (> 100 3) {big} {small})`.  
+`>=` Returns `1` if the first element is greater than or equal to the second. `0` otherwise.  
+`<=` Returns `1` if the first element is less than or equal to the second. `0` otherwise.  
+`==` Returns `1` if two elements are equal. `0` otherwise.  
+`!=` Returns `1` if two elements aren't equal. `0` otherwise.  
+`if` Returns the first value if the condition is true and the second value if it's false. Eg: `if (> 100 3) {big} {small}`  
 
-### List operators
-`head` Returns the first element in a List  
-`tail` Returns the rest of a List (without the first element)  
-`join` Makes one new List from two Lists  
+### List operators   
+`head` Returns the first element in a Q-Expression  
+`tail` Returns the rest of a Q-Expression (without the first element)  
+`join` Makes one new Q-Expression from multiple Q-Expressions  
+`eval` Attempts to evaluate a Q-Expression 
 
 # Dependencies
 This repo contains a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](https://github.com/orangeduck/mpc)

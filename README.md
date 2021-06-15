@@ -130,7 +130,7 @@ The eagle-eyed among you might have noticed that the order matters here. The exp
 `def` Assigns a value or expression to a symbol  
 `\` Defines a function. Eg: `\ {params} {body}`  
 `;` Starts a comment until end of the line  
-`print` Prints value to screen
+`print` Prints values to screen
 
 ### Math operators
 ` + ` Adds elements  
@@ -139,13 +139,13 @@ The eagle-eyed among you might have noticed that the order matters here. The exp
 ` / ` Divides elements  
 
 ### Conditional operators
-` > ` Returns `1` if the first element is greater than the second. `0` otherwise.  
-` < ` Returns `1` if the first element is less than the second. `0` otherwise.  
-`>=` Returns `1` if the first element is greater than or equal to the second. `0` otherwise.  
-`<=` Returns `1` if the first element is less than or equal to the second. `0` otherwise.  
-`==` Returns `1` if two elements are equal. `0` otherwise.  
-`!=` Returns `1` if two elements aren't equal. `0` otherwise.  
-`if` Returns the first value if the condition is true and the second value if it's false. Eg: `if (> 100 3) {big} {small}`  
+` > ` Evaluates to `1` if the first element is greater than the second. `0` otherwise.  
+` < ` Evaluates to `1` if the first element is less than the second. `0` otherwise.  
+`>=` Evaluates to `1` if the first element is greater than or equal to the second. `0` otherwise.  
+`<=` Evaluates to `1` if the first element is less than or equal to the second. `0` otherwise.  
+`==` Evaluates to `1` if two elements are equal. `0` otherwise.  
+`!=` Evaluates to `1` if two elements aren't equal. `0` otherwise.  
+`if` Evaluates the first expression if the condition is true and the second one if it's false. Eg: `if (> 100 3) {big} {small}`  
 
 ### List operators   
 `head` Returns the first element in a Quoted Expression  

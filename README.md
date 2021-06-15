@@ -139,6 +139,7 @@ The eagle-eyed among you might have noticed that the order matters here. The exp
 ` / ` Divides elements  
 
 ### Conditional operators
+`0` is considered falsy, all other numbers are considered truthy.  
 ` > ` Evaluates to `1` if the first element is greater than the second. `0` otherwise.  
 ` < ` Evaluates to `1` if the first element is less than the second. `0` otherwise.  
 `>=` Evaluates to `1` if the first element is greater than or equal to the second. `0` otherwise.  

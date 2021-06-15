@@ -46,13 +46,13 @@ Like a [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language)) program
 ```
 ( some expression )
 ```
-When *expressions* get *evaluated*, they produce a value -- which can in turn be part of another expression.
+When expressions get *evaluated*, they produce a value -- which can in turn be part of another expression.
 ```
 ( some expression ( another expression to be part of the first ) )
 ```
 Expressions get evaluated by applying a *function* to its elements. The function (or operator) is always the first element in the expression.
 ```
-( function element element element )
+( operator element element element )
 ```
 The addition operator `+`, for example, adds all its elements together. So the expression `(+ 1 2 3)` evaluates to `6`. We can now combine what we learned earlier to say that the expression `(+ 1 2 3 (+ 1 2 3))` would evaluate to `12` -- The nested expression evaluates to `6`, which then becomes part of evaluating the outer expression.  
 

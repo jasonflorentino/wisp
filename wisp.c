@@ -230,11 +230,6 @@ wval* wval_add(wval* v, wval* x)
 	return v;
 }
 
-/** 
- * `wval_pop` extracts a single element from an S-Expression at
- * index `i` and shifts the rest of the list backward so that it
- * no longer contains that `wval*`
- */
 wval* wval_pop(wval* v, int i)
 {
 	wval* x = v->cell[i];
@@ -246,10 +241,6 @@ wval* wval_pop(wval* v, int i)
 	return x;
 }
 
-/**
- * `wval_take` extracts a single element from an S-Expression at
- * index `i` and deletes the list it extracted the element from.
- */
 wval* wval_take(wval* v, int i)
 {
 	wval* x = wval_pop(v, i);
@@ -257,10 +248,6 @@ wval* wval_take(wval* v, int i)
 	return x;
 }
 
-/**
- * `wval_join` pops each item from `y`, adds it to `x`
- * then returns `x`.
- */
 wval* wval_join(wval* x, wval* y)
 {
 	while (y->count) {
@@ -365,6 +352,7 @@ char* wtype_name(int t)
 		default:         return "Unknown";
 	}
 }
+
 /* Wisp Environment */
 
 struct wenv
@@ -481,10 +469,6 @@ void wenv_def(wenv* e, wval* k, wval* v)
 
 wval* wval_eval(wenv* e, wval* v);
 
-/**
- * `head` takes a Q-Expression and returns a Q-Expression with only
- * the first element.
- */
 wval* builtin_head(wenv* e, wval* a)
 {
 	WASSERT_NUM("head", a, 1);
@@ -496,10 +480,6 @@ wval* builtin_head(wenv* e, wval* a)
 	return v;
 }
 
-/**
- * `tail` takes a Q-Expression and returns a Q-Expression with
- * the first element removed.
- */
 wval* builtin_tail(wenv* e, wval* a)
 {
 	WASSERT_NUM("tail", a, 1);
@@ -511,19 +491,12 @@ wval* builtin_tail(wenv* e, wval* a)
 	return v;
 }
 
-/**
- * `list` takes an S-Expression and returns it as a Q-Expression.
- */
 wval* builtin_list(wenv* e, wval* a)
 {
 	a->type = WVAL_QEXPR;
 	return a;
 }
 
-/**
- * `builtin_join` takes one or more Q-Expressions and returns
- * a Q-Expression of them joined together.
- */
 wval* builtin_join(wenv* e, wval* a)
 {
 	for (int i = 0; i < a->count; i++) {
@@ -539,10 +512,6 @@ wval* builtin_join(wenv* e, wval* a)
 	return x;
 }
 
-/**
- * `eval` takes a single Q-Expression, converts it to an S-Expression
- * and evaluates it using `wval_eval`.
- */
 wval* builtin_eval(wenv* e, wval* a)
 {
 	WASSERT_NUM("eval", a, 1);

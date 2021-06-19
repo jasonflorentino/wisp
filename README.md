@@ -51,11 +51,11 @@ When expressions get *evaluated*, they produce a value -- which can in turn be p
 ```
 ( some expression ( another expression to be part of the first ) )
 ```
-Expressions get evaluated by applying a *function* to its elements. The function (or operator) is always the first element in the expression.
+Expressions get evaluated by applying a *function* to its elements. The function (or operator) is always the first element in the expression. This is called [Polish](https://en.wikipedia.org/wiki/Polish_notation), or prefix, notation.
 ```
 ( operator element element element )
 ```
-The addition operator `+`, for example, adds all its elements together. So the expression `(+ 1 2 3)` evaluates to `6`. We can now combine what we learned earlier to say that the expression `(+ 1 2 3 (+ 1 2 3))` would evaluate to `12` -- The nested expression evaluates to `6`, which then becomes part of evaluating the outer expression.  
+The addition operator `+`, for example, adds all its elements together. So the expression `(+ 1 2 3)` evaluates to `6`. We can now combine what we learned earlier to say that the expression `(+ 1 2 3 (+ 1 2 3))` would evaluate to `12` — The nested expression evaluates to `6`, which then becomes part of evaluating the outer expression.  
 
 As you might expect, minus, multiply, and divide are also operators:
 ```

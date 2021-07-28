@@ -1,5 +1,5 @@
 # 👻 Wisp
-### ***A Lisp-y language made reading [buildyourownlisp.com](http://www.buildyourownlisp.com/) by [Daniel Holden](https://github.com/orangeduck)***
+#### ***A Lisp-y language made reading [buildyourownlisp.com](http://www.buildyourownlisp.com/) by [Daniel Holden](https://github.com/orangeduck)***
 
 I was looking for some resources to learn more about C and came across this wonderful project. In fourteen short but meaningful chapters, Daniel walks you through building a language from scratch. I highly recommend it for anyone interested in C or the inner workings of programming languages. While I'm not sure I could roll some of the features he teaches on my own yet, I certainly feel more comfortable in my knowledge of C programs and learned some excellent foundations on the design of programming languages. Thanks Daniel!
 
@@ -13,7 +13,8 @@ June 2021
 - [The Basics](#the-basics)
 - [Examples](#examples)
 - [Language Reference](#language-reference)
-- [Dependencies](#dependencies)
+- [Dependencies](#dependencies)  
+- [Whats Next?](#what-next)
 
 ---
 
@@ -51,7 +52,7 @@ When expressions get *evaluated*, they produce a value -- which can in turn be p
 ```
 ( some expression ( another expression to be part of the first ) )
 ```
-Expressions get evaluated by applying a *function* to its elements. The function (or operator) is always the first element in the expression. This is called [Polish](https://en.wikipedia.org/wiki/Polish_notation), or prefix, notation.
+Expressions get evaluated by applying a *function* to its elements. The function (or operator) is always the first element in the expression. This is called [Polish](https://en.wikipedia.org/wiki/Polish_notation), or *prefix*, notation.
 ```
 ( operator element element element )
 ```
@@ -64,6 +65,8 @@ As you might expect, minus, multiply, and divide are also operators:
 (/ 10 2)  evalutes to 5
 ```
 The eagle-eyed among you might have noticed that the order matters here. The expressions are evaluated from left to right. `(- 1 2 3)` evaluates to `-4`, whereas `(- 2 3 1)` would evaluate to `-2`. `(/ 10 2)`  becomes `5`, but `(/ 2 10)` would be `0`. (Floating point numbers are not yet supported.)
+
+That's all I've got to say on the basics for now. I hope to one day further refine and flesh out this code and the language features. To help with picking up the rest, I've put together some examples in the following section, and be sure to checkout the Language Reference for the rest.
 
 ## Examples
 
@@ -156,6 +159,21 @@ The eagle-eyed among you might have noticed that the order matters here. The exp
 
 # Dependencies
 This repo contains a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](https://github.com/orangeduck/mpc)
+
+# What Next?
+*Some things I'd like to work on in the future*  
+▫️ Include a standard library of functions  
+▫️ Refactor parts of the code into header files  
+▫️ Add other operatros like modulo or exponentiation  
+▫️ Enable running script files from the command line instead of requiring code to run in a REPL  
+▫️ Add other types like boolean or floating point numbers  
+▫️ Add logical operators like `and`, `or`, etc.  
+
+*And some other projects I find interesting (from Daniel's* Bonus Projects *chapter):*  
+▫️ Variable Hashtable  
+▫️ Garbage Collection  
+▫️ Tail Call Optimisation  
+▫️ Operating System Interaction  
 
 <!-- 
 781         wenv_add_builtin(e, "list", builtin_list);

@@ -164,8 +164,8 @@ This repo contains a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](h
 *Some things I'd like to work on in the future*  
 ▫️ Include a standard library of functions  
 ▫️ Refactor parts of the code into header files  
-▫️ Add other operatros like modulo or exponentiation  
-▫️ Enable running script files from the command line instead of requiring code to run in a REPL  
+▫️ Add other operators like modulo or exponentiation  
+▫️ Enable running script files from the command line instead of requiring code to run in the REPL  
 ▫️ Add other types like boolean or floating point numbers  
 ▫️ Add logical operators like `and`, `or`, etc.  
 

@@ -9,6 +9,7 @@ Over the course of a couple weeks I wrote what you see in `wisp.c` (lovingly cod
 June 2021
 
 ---
+### Contents  
 
 - [Installation](#installation)
 - [Language Features](#language-features)
@@ -24,6 +25,8 @@ June 2021
 
 ## Installation
 To run Wisp, download or clone this repo, compile `wisp.c` and run the output file. This starts up a REPL in the terminal window.
+
+[⬆️  `Back to top`](#contents)
 
 ### Compile on Linux and Mac
 ```
@@ -44,6 +47,8 @@ Wisp is a [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language))-like
 - Arithmetic and Comparison operators
 - Conditional statements
 - Comments
+
+[⬆️  `Back to top`](#contents)
 
 ## The Basics
 Like a [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language)) program, Wisp code is just a bunch of *expressions*. Expressions are contained within parentheses.
@@ -69,6 +74,8 @@ As you might expect, minus, multiply, and divide are also operators:
 The eagle-eyed among you might have noticed that the order matters here. The expressions are evaluated from left to right. `(- 1 2 3)` evaluates to `-4`, whereas `(- 2 3 1)` would evaluate to `-2`. `(/ 10 2)`  becomes `5`, but `(/ 2 10)` would be `0`. (Floating point numbers are not yet supported.)
 
 That's all I've got to say on the basics for now. I hope to one day further refine and flesh out this code and the language features. To help with picking up the rest, I've put together some examples in the following section, and be sure to checkout the Language Reference for the rest.
+
+[⬆️  `Back to top`](#contents)
 
 ## Examples
 
@@ -125,6 +132,8 @@ That's all I've got to say on the basics for now. I hope to one day further refi
 < "Good morning!"
 ```
 
+[⬆️  `Back to top`](#contents)
+
 ## Language Reference
 
 `42` Number  
@@ -159,8 +168,12 @@ That's all I've got to say on the basics for now. I hope to one day further refi
 `join` Makes one new Q-Expression from multiple Q-Expressions  
 `eval` Attempts to evaluate a Q-Expression 
 
+[⬆️  `Back to top`](#contents)
+
 # Dependencies
 This repo contains a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](https://github.com/orangeduck/mpc)
+
+[⬆️  `Back to top`](#contents)
 
 # What Next?
 *Some things I'd like to work on in the future*  
@@ -176,6 +189,8 @@ This repo contains a copy `mpc.c` and `mpc.h` from [github.com/orangeduck/mpc](h
 ▫️ Garbage Collection  
 ▫️ Tail Call Optimisation  
 ▫️ Operating System Interaction  
+
+[⬆️  `Back to top`](#contents)
 
 <!-- 
 781         wenv_add_builtin(e, "list", builtin_list);

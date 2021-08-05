@@ -73,7 +73,7 @@ As you might expect, minus, multiply, and divide are also operators:
 ```
 The eagle-eyed among you might have noticed that the order matters here. The expressions are evaluated from left to right. `(- 1 2 3)` evaluates to `-4`, whereas `(- 2 3 1)` would evaluate to `-2`. `(/ 10 2)`  becomes `5`, but `(/ 2 10)` would be `0`. (Floating point numbers are not yet supported.)
 
-That's all I've got to say on the basics for now. I hope to one day further refine and flesh out this code and the language features. To help with picking up the rest, I've put together some examples in the following section, and be sure to checkout the Language Reference for the rest.
+That's all I've got to say on the basics for now. I hope to one day further refine and flesh out this code and the language features. To help with picking up the rest, I've put together some examples in the following section, and be sure to checkout the [Language Reference](#language-reference) for the rest.
 
 [⬆️  `Back to top`](#contents)
 

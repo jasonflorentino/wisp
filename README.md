@@ -3,6 +3,8 @@
 
 I was looking for some resources to learn more about C and came across this wonderful book. In fourteen short but meaningful chapters, Daniel walks you through building a language from scratch. I highly recommend it for anyone interested in C or the inner workings of programming languages. While I'm not sure I could roll some of the features he teaches on my own yet, I certainly feel more comfortable in my knowledge of C programs and learned some excellent foundations on the design of programming languages. Thanks Daniel!
 
+Over the course of a couple weeks I wrote what you see in `wisp.c` (lovingly coded in a zsh terminal with vim) as well as this documentation. I'm happy to be able to say I've now got my own mini-language! I hope you like it, or at least enjoy the read. Thanks for stopping by!
+
 —Jason  
 June 2021
 

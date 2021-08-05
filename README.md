@@ -26,8 +26,6 @@ June 2021
 ## Installation
 To run Wisp, download or clone this repo, compile `wisp.c` and run the output file. This starts up a REPL in the terminal window.
 
-[⬆️  `Back to top`](#contents)
-
 ### Compile on Linux and Mac
 ```
 cc -std=c99 -Wall wisp.c mpc.c -ledit -lm -o wisp
@@ -36,6 +34,8 @@ cc -std=c99 -Wall wisp.c mpc.c -ledit -lm -o wisp
 ```
 cc -std=c99 -Wall wisp.c mpc.c -o wisp
 ```
+
+[⬆️  `Back to top`](#contents)
 
 ## Language Features
 Wisp is a [Lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language))-like language that supports some basic features:

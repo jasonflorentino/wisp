@@ -980,7 +980,7 @@ int main(int argc, char** argv)
 
 	if (argc == 1)
 	{		
-		puts("\n Wispy Version 0.0.6");
+		puts("\n Wisp Version 0.0.6");
 		puts(" A lisp-y language by Jason");
 		puts(" Made reading buildyourownlisp.com by Daniel Holden");
 		puts(" Press Ctrl+C to exit\n");
